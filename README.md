@@ -178,9 +178,12 @@ pytest
 
 # Format code
 black .
+isort .
+ruff check --fix .
 
 # Lint code
 ruff check .
+mypy fractal_projections
 ```
 
 ## License
