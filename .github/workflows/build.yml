@@ -28,7 +28,7 @@ jobs:
 
             - name: Install dependencies
               run: |
-                  pip install pytest pytest-cov
+                  make dev-deps
 
             - name: Run tests
               run: |
