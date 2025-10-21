@@ -24,7 +24,7 @@ deps:
 
 # Install development dependencies using uv
 dev-deps:
-	uv pip install -e ".[dev]" pytest isort
+	uv pip install -e ".[dev]"
 
 # Full development setup with uv
 dev-install:
