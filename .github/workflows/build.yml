@@ -28,11 +28,11 @@ jobs:
 
             - name: Install dependencies
               run: |
-                  make deps
+                  pip install pytest
 
             - name: Run tests
               run: |
-                  make test
+                  pytest
 
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v3
