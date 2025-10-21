@@ -7,10 +7,10 @@
 
 <!-- Badges -->
 
-[pypi-image]: https://img.shields.io/pypi/v/fractal-orojections
-[pypi-url]: https://pypi.org/project/fractal-orojections/
-[build-image]: https://github.com/Fractal-Forge/fractal-orojections/actions/workflows/build.yml/badge.svg
-[build-url]: https://github.com/Fractal-Forge/fractal-orojections/actions/workflows/build.yml
+[pypi-image]: https://img.shields.io/pypi/v/fractal-projections
+[pypi-url]: https://pypi.org/project/fractal-projections/
+[build-image]: https://github.com/Fractal-Forge/fractal-projections/actions/workflows/build.yml/badge.svg
+[build-url]: https://github.com/Fractal-Forge/fractal-projections/actions/workflows/build.yml
 
 This library complements [fractal-specifications](https://pypi.org/project/fractal-specifications/) (which handles filtering) by providing database-agnostic data shaping capabilities.
 
