@@ -23,7 +23,7 @@ from fractal_specifications.generic.operators import (
     InSpecification,
 )
 
-from .projections import (
+from fractal_projections.projections import (
     AggregateFunction,
     AggregateProjection,
     FieldProjection,

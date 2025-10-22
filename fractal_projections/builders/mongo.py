@@ -4,21 +4,98 @@ MongoDB Projection Builder
 Converts generic projections to MongoDB aggregation pipeline stages.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
-from ..projections.fields import (
+from fractal_specifications.contrib.mongo.specifications import (
+    MongoSpecificationBuilder,
+)
+
+from fractal_projections.builders.base import ProjectionBuilder
+from fractal_projections.projections.fields import (
     AggregateFunction,
     AggregateProjection,
     FieldProjection,
     ProjectionList,
 )
-from ..projections.grouping import GroupingProjection
-from ..projections.limiting import LimitProjection
-from ..projections.ordering import OrderingList
+from fractal_projections.projections.grouping import GroupingProjection
+from fractal_projections.projections.limiting import LimitProjection
+from fractal_projections.projections.ordering import OrderingList
+from fractal_projections.projections.query import QueryProjection
 
 
-class MongoProjectionBuilder:
-    """Builds MongoDB aggregation pipeline from projection objects"""
+class MongoProjectionBuilder(ProjectionBuilder):
+    """Builds MongoDB aggregation pipeline from projection objects and complete queries"""
+
+    def __init__(self, collection_name: str = None):
+        """
+        Initialize builder, optionally with a collection name for complete queries
+
+        Args:
+            collection_name: Name of the collection to query (required for build(), build_count())
+        """
+        super().__init__(collection_name)
+
+    def build(self, query_projection: QueryProjection) -> Tuple[List[Dict], None]:
+        """
+        Build complete MongoDB aggregation pipeline from QueryProjection
+
+        Args:
+            query_projection: The query projection to convert
+
+        Returns:
+            Tuple of (pipeline_list, None)
+
+        Example:
+            builder = MongoProjectionBuilder("users")
+            pipeline, _ = builder.build(query)
+            # pipeline is a list like [{"$match": {fractal_projections..}}, {"$group": {fractal_projections..}}]
+        """
+        self._require_collection_name("build")
+
+        pipeline = []
+
+        # Add $match stage for filter
+        if query_projection.filter:
+            match_filter = MongoSpecificationBuilder.build(query_projection.filter)
+            if match_filter:
+                pipeline.append({"$match": match_filter})
+
+        # Build projection/grouping/ordering/limiting stages
+        projection_pipeline = self.build_pipeline(
+            query_projection.projection,
+            query_projection.grouping,
+            query_projection.ordering,
+            query_projection.limiting,
+        )
+
+        pipeline.extend(projection_pipeline)
+
+        return pipeline, None
+
+    def build_count(self, query_projection: QueryProjection) -> Tuple[List[Dict], None]:
+        """
+        Build optimized COUNT aggregation pipeline from QueryProjection
+
+        Args:
+            query_projection: The query projection to convert
+
+        Returns:
+            Tuple of (pipeline_list, None)
+        """
+        self._require_collection_name("build_count")
+
+        pipeline = []
+
+        # Add $match stage for filter
+        if query_projection.filter:
+            match_filter = MongoSpecificationBuilder.build(query_projection.filter)
+            if match_filter:
+                pipeline.append({"$match": match_filter})
+
+        # Add $count stage
+        pipeline.append({"$count": "count"})
+
+        return pipeline, None
 
     @staticmethod
     def build_pipeline(
@@ -32,8 +109,8 @@ class MongoProjectionBuilder:
 
         Returns a list of pipeline stages like:
         [
-            {"$group": {...}},
-            {"$sort": {...}},
+            {"$group": {fractal_projections..}},
+            {"$sort": {fractal_projections..}},
             {"$limit": 10}
         ]
         """

@@ -4,21 +4,92 @@ Elasticsearch Projection Builder
 Converts generic projections to Elasticsearch query DSL with aggregations.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
-from ..projections.fields import (
+from fractal_specifications.contrib.elasticsearch.specifications import (
+    ElasticSpecificationBuilder,
+)
+
+from fractal_projections.builders.base import ProjectionBuilder
+from fractal_projections.projections.fields import (
     AggregateFunction,
     AggregateProjection,
     FieldProjection,
     ProjectionList,
 )
-from ..projections.grouping import GroupingProjection
-from ..projections.limiting import LimitProjection
-from ..projections.ordering import OrderingList
+from fractal_projections.projections.grouping import GroupingProjection
+from fractal_projections.projections.limiting import LimitProjection
+from fractal_projections.projections.ordering import OrderingList
+from fractal_projections.projections.query import QueryProjection
 
 
-class ElasticsearchProjectionBuilder:
-    """Builds Elasticsearch query DSL from projection objects"""
+class ElasticsearchProjectionBuilder(ProjectionBuilder):
+    """Builds Elasticsearch query DSL from projection objects and complete queries"""
+
+    def __init__(self, index_name: str = None):
+        """
+        Initialize builder, optionally with an index name for complete queries
+
+        Args:
+            index_name: Name of the index to query (required for build(), build_count())
+        """
+        super().__init__(index_name)
+        self.index_name = index_name  # Alias for backwards compatibility
+
+    def build(self, query_projection: QueryProjection) -> Tuple[Dict, None]:
+        """
+        Build complete Elasticsearch query from QueryProjection
+
+        Args:
+            query_projection: The query projection to convert
+
+        Returns:
+            Tuple of (query_dict, None)
+
+        Example:
+            builder = ElasticsearchProjectionBuilder("users")
+            query, _ = builder.build(query_projection)
+        """
+        self._require_collection_name("build")
+
+        # Build the query using static method
+        query = self.build_query(
+            query_projection.projection,
+            query_projection.grouping,
+            query_projection.ordering,
+            query_projection.limiting,
+        )
+
+        # Add filter/query clause
+        if query_projection.filter:
+            es_query = ElasticSpecificationBuilder.build(query_projection.filter)
+            if es_query:
+                query["query"] = es_query
+
+        return query, None
+
+    def build_count(self, query_projection: QueryProjection) -> Tuple[Dict, None]:
+        """
+        Build optimized COUNT query from QueryProjection
+
+        Args:
+            query_projection: The query projection to convert
+
+        Returns:
+            Tuple of (count_query_dict, None)
+        """
+        self._require_collection_name("build_count")
+
+        query = {}
+
+        # Add filter if present
+        if query_projection.filter:
+            es_query = ElasticSpecificationBuilder.build(query_projection.filter)
+            if es_query:
+                query["query"] = es_query
+
+        # For count queries, we just need the query part, not aggregations
+        return query, None
 
     @staticmethod
     def build_query(

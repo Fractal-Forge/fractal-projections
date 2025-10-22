@@ -8,10 +8,10 @@ This library complements fractal_specifications (which handles filtering)
 by providing data shaping capabilities.
 """
 
-from .builders import *
-from .projections import *
+from fractal_projections.builders import *
+from fractal_projections.projections import *
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core projections

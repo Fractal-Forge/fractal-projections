@@ -10,15 +10,15 @@ from typing import List, Optional
 
 from fractal_specifications.generic.specification import Specification
 
-from .fields import (
+from fractal_projections.projections.fields import (
     AggregateFunction,
     AggregateProjection,
     FieldProjection,
     ProjectionList,
 )
-from .grouping import GroupingProjection
-from .limiting import LimitProjection
-from .ordering import OrderingList
+from fractal_projections.projections.grouping import GroupingProjection
+from fractal_projections.projections.limiting import LimitProjection
+from fractal_projections.projections.ordering import OrderingList
 
 
 @dataclass

@@ -68,7 +68,7 @@ class AggregateProjection:
             return len(results)
         elif self.function == AggregateFunction.COUNT_DISTINCT:
             if self.field:
-                return len(set(getattr(item, self.field) for item in results))
+                return len({getattr(item, self.field) for item in results})
             return len(set(results))
         elif self.function == AggregateFunction.SUM:
             return sum(getattr(item, self.field) for item in results)

@@ -6,11 +6,11 @@ how to transform it) as opposed to specifications which define filtering
 operations (what data to include/exclude).
 """
 
-from .fields import *
-from .grouping import *
-from .limiting import *
-from .ordering import *
-from .query import *
+from fractal_projections.projections.fields import *
+from fractal_projections.projections.grouping import *
+from fractal_projections.projections.limiting import *
+from fractal_projections.projections.ordering import *
+from fractal_projections.projections.query import *
 
 __all__ = [
     # Field projections

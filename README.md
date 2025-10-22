@@ -79,7 +79,8 @@ query = QueryProjection(
 builder = PostgresProjectionBuilder("users")
 sql, params = builder.build(query)
 print(sql)
-# SELECT id, name, created_at FROM users WHERE status = $1 ORDER BY created_at DESC LIMIT 10
+# SELECT id, name, created_at FROM users WHERE status = %s ORDER BY created_at DESC LIMIT 10
+# params = ['active']
 ```
 
 ## Core Concepts
@@ -206,4 +207,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Related Projects
 
-- [fractal-projections](https://github.com/Fractal-Forge/fractal-projections) - Database-agnostic filtering system
+- [fractal-specifications](https://github.com/douwevandermeij/fractal-specifications) - Database-agnostic filtering system

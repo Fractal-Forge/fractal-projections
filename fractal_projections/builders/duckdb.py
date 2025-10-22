@@ -1,30 +1,32 @@
 """
-PostgreSQL Projection Builder
+DuckDB Projection Builder
 
-Converts generic projections to PostgreSQL-specific SQL syntax.
+Converts generic projections to DuckDB-specific SQL syntax.
+DuckDB is similar to PostgreSQL but uses ? placeholders for parameterized queries.
 """
 
 from typing import Any, List, Tuple
 
-from fractal_specifications.contrib.postgresql.specifications import (
-    PostgresSpecificationBuilder,
+from fractal_specifications.contrib.duckdb.specifications import (
+    DuckDBSpecificationBuilder,
 )
 
 from fractal_projections.builders.base import ProjectionBuilder
-from fractal_projections.projections.fields import (
-    AggregateFunction,
-    AggregateProjection,
-    FieldProjection,
-    ProjectionList,
-)
 from fractal_projections.projections.grouping import GroupingProjection
 from fractal_projections.projections.limiting import LimitProjection
 from fractal_projections.projections.ordering import OrderingList
 from fractal_projections.projections.query import QueryProjection
 
+from ..projections.fields import (
+    AggregateFunction,
+    AggregateProjection,
+    FieldProjection,
+    ProjectionList,
+)
 
-class PostgresProjectionBuilder(ProjectionBuilder):
-    """Builds PostgreSQL-specific SQL from projection objects and complete queries"""
+
+class DuckDBProjectionBuilder(ProjectionBuilder):
+    """Builds DuckDB-specific SQL from projection objects and complete queries"""
 
     def __init__(self, table_name: str = None):
         """
@@ -38,16 +40,16 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
     @staticmethod
     def build_select(projection: ProjectionList) -> str:
-        """Convert ProjectionList to PostgreSQL SELECT clause"""
+        """Convert ProjectionList to DuckDB SELECT clause"""
         if not projection.fields:
             return "*"
 
         field_exprs = []
         for field_spec in projection.fields:
             if isinstance(field_spec, FieldProjection):
-                expr = PostgresProjectionBuilder._build_field_projection(field_spec)
+                expr = DuckDBProjectionBuilder._build_field_projection(field_spec)
             elif isinstance(field_spec, AggregateProjection):
-                expr = PostgresProjectionBuilder._build_aggregate_projection(field_spec)
+                expr = DuckDBProjectionBuilder._build_aggregate_projection(field_spec)
             else:
                 raise ValueError(f"Unknown projection type: {type(field_spec)}")
 
@@ -62,7 +64,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
     @staticmethod
     def _build_field_projection(field: FieldProjection) -> str:
-        """Convert FieldProjection to PostgreSQL field expression"""
+        """Convert FieldProjection to DuckDB field expression"""
         expr = field.field
         if field.alias:
             expr += f" AS {field.alias}"
@@ -70,7 +72,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
     @staticmethod
     def _build_aggregate_projection(agg: AggregateProjection) -> str:
-        """Convert AggregateProjection to PostgreSQL aggregate expression"""
+        """Convert AggregateProjection to DuckDB aggregate expression"""
         if agg.function == AggregateFunction.COUNT and agg.field is None:
             expr = "COUNT(*)"
         elif agg.function == AggregateFunction.COUNT_DISTINCT:
@@ -84,12 +86,12 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
     @staticmethod
     def build_group_by(grouping: GroupingProjection) -> str:
-        """Convert GroupingProjection to PostgreSQL GROUP BY clause"""
+        """Convert GroupingProjection to DuckDB GROUP BY clause"""
         return ", ".join(grouping.fields)
 
     @staticmethod
     def build_order_by(ordering: OrderingList) -> str:
-        """Convert OrderingList to PostgreSQL ORDER BY clause"""
+        """Convert OrderingList to DuckDB ORDER BY clause"""
         if not ordering:
             return ""
 
@@ -103,7 +105,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
     @staticmethod
     def build_limit(limit: LimitProjection) -> str:
-        """Convert LimitProjection to PostgreSQL LIMIT/OFFSET clause"""
+        """Convert LimitProjection to DuckDB LIMIT/OFFSET clause"""
         sql = f"LIMIT {limit.limit}"
         if limit.offset > 0:
             sql += f" OFFSET {limit.offset}"
@@ -111,7 +113,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
     def build(self, query_projection: QueryProjection) -> Tuple[str, List[Any]]:
         """
-        Build complete PostgreSQL query from QueryProjection
+        Build complete DuckDB query from QueryProjection
 
         Args:
             query_projection: The query projection to convert
@@ -120,12 +122,12 @@ class PostgresProjectionBuilder(ProjectionBuilder):
             Tuple of (query_string, parameters)
 
         Example:
-            builder = PostgresProjectionBuilder("users")
+            builder = DuckDBProjectionBuilder("users")
             sql, params = builder.build(query)
         """
         if not self.table_name:
             raise ValueError(
-                "table_name is required for build(). Initialize with PostgresProjectionBuilder(table_name)"
+                "table_name is required for build(). Initialize with DuckDBProjectionBuilder(table_name)"
             )
 
         query_parts = []
@@ -143,7 +145,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
         # WHERE clause
         if query_projection.filter:
-            where_clause, where_params = PostgresSpecificationBuilder.build(
+            where_clause, where_params = DuckDBSpecificationBuilder.build(
                 query_projection.filter
             )
             if where_clause and where_clause != "TRUE":
@@ -182,7 +184,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
         """
         if not self.table_name:
             raise ValueError(
-                "table_name is required for build_count(). Initialize with PostgresProjectionBuilder(table_name)"
+                "table_name is required for build_count(). Initialize with DuckDBProjectionBuilder(table_name)"
             )
 
         query_parts = ["SELECT COUNT(*)"]
@@ -193,7 +195,7 @@ class PostgresProjectionBuilder(ProjectionBuilder):
 
         # WHERE clause
         if query_projection.filter:
-            where_clause, where_params = PostgresSpecificationBuilder.build(
+            where_clause, where_params = DuckDBSpecificationBuilder.build(
                 query_projection.filter
             )
             if where_clause and where_clause != "TRUE":
@@ -215,9 +217,9 @@ class PostgresProjectionBuilder(ProjectionBuilder):
         """
         if not self.table_name:
             raise ValueError(
-                "table_name is required for explain(). Initialize with PostgresProjectionBuilder(table_name)"
+                "table_name is required for explain(). Initialize with DuckDBProjectionBuilder(table_name)"
             )
 
         query, params = self.build(query_projection)
-        explain_query = f"EXPLAIN (ANALYZE, BUFFERS) {query}"
+        explain_query = f"EXPLAIN {query}"
         return explain_query, params
