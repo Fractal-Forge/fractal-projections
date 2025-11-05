@@ -68,41 +68,27 @@ class TestDuckDBProjectionBuilder:
         result = DuckDBProjectionBuilder.build_select(projection)
         assert result == "COUNT(*)"
 
-    def test_build_aggregate_count_with_field(self):
-        """Test building COUNT(field) aggregate"""
+    @pytest.mark.parametrize(
+        "function,field,alias,expected_sql",
+        [
+            (AggregateFunction.COUNT, "id", None, "COUNT(id)"),
+            (
+                AggregateFunction.COUNT_DISTINCT,
+                "user_id",
+                None,
+                "COUNT(DISTINCT user_id)",
+            ),
+            (AggregateFunction.SUM, "amount", None, "SUM(amount)"),
+            (AggregateFunction.AVG, "score", "avg_score", "AVG(score) AS avg_score"),
+        ],
+    )
+    def test_build_aggregate_functions(self, function, field, alias, expected_sql):
+        """Test building aggregate functions (COUNT, COUNT_DISTINCT, SUM, AVG)"""
         projection = ProjectionList(
-            [AggregateProjection(AggregateFunction.COUNT, field="id")]
+            [AggregateProjection(function, field=field, alias=alias)]
         )
         result = DuckDBProjectionBuilder.build_select(projection)
-        assert result == "COUNT(id)"
-
-    def test_build_aggregate_count_distinct(self):
-        """Test building COUNT(DISTINCT field)"""
-        projection = ProjectionList(
-            [AggregateProjection(AggregateFunction.COUNT_DISTINCT, field="user_id")]
-        )
-        result = DuckDBProjectionBuilder.build_select(projection)
-        assert result == "COUNT(DISTINCT user_id)"
-
-    def test_build_aggregate_sum(self):
-        """Test building SUM aggregate"""
-        projection = ProjectionList(
-            [AggregateProjection(AggregateFunction.SUM, field="amount")]
-        )
-        result = DuckDBProjectionBuilder.build_select(projection)
-        assert result == "SUM(amount)"
-
-    def test_build_aggregate_with_alias(self):
-        """Test building aggregate with alias"""
-        projection = ProjectionList(
-            [
-                AggregateProjection(
-                    AggregateFunction.AVG, field="score", alias="avg_score"
-                )
-            ]
-        )
-        result = DuckDBProjectionBuilder.build_select(projection)
-        assert result == "AVG(score) AS avg_score"
+        assert result == expected_sql
 
     def test_build_group_by_single_field(self):
         """Test building GROUP BY with single field"""
@@ -361,3 +347,22 @@ class TestDuckDBQueryBuilder:
         assert "GROUP BY department" in sql
         assert "ORDER BY employee_count DESC" in sql
         assert params == []
+
+    def test_build_select_with_invalid_projection_type(self):
+        """Test that build_select raises error for unknown projection type (line 53)"""
+        # Create an invalid projection type
+        class InvalidProjection:
+            pass
+
+        projection = ProjectionList([InvalidProjection()])
+
+        builder = DuckDBProjectionBuilder("test_table")
+
+        # Should raise ValueError for unknown projection type
+        with pytest.raises(ValueError, match="Unknown projection type"):
+            builder.build_select(projection)
+
+    def test_build_order_by_with_none(self):
+        """Test build_order_by returns empty string for None (line 95)"""
+        result = DuckDBProjectionBuilder.build_order_by(None)
+        assert result == ""

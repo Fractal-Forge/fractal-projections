@@ -7,7 +7,7 @@ Firestore has limited aggregation capabilities compared to SQL databases.
 Most complex operations require client-side processing.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from fractal_specifications.contrib.google_firestore.specifications import (
     FirestoreSpecificationBuilder,
@@ -38,7 +38,7 @@ class FirestoreProjectionBuilder(ProjectionBuilder):
         """
         super().__init__(collection_name)
 
-    def build(self, query_projection: QueryProjection) -> Tuple[Dict, None]:
+    def build(self, query_projection: QueryProjection) -> Dict:
         """
         Build complete Firestore query configuration from QueryProjection
 
@@ -46,21 +46,24 @@ class FirestoreProjectionBuilder(ProjectionBuilder):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (query_config_dict, None)
+            Firestore query configuration dictionary
 
         Example:
             builder = FirestoreProjectionBuilder("users")
-            config, _ = builder.build(query)
+            config = builder.build(query)
         """
-        self._require_collection_name("build")
-
+        # Note: collection_name is optional for Firestore as configs are collection-agnostic
         config = {}
 
         # Add filter configuration
         if query_projection.filter:
             filter_query = FirestoreSpecificationBuilder.build(query_projection.filter)
             if filter_query:
-                config["where_clauses"] = filter_query
+                # Normalize to list: single tuple -> [tuple], list stays list
+                if isinstance(filter_query, tuple):
+                    config["where_clauses"] = [filter_query]
+                else:
+                    config["where_clauses"] = filter_query
 
         # Add projection configuration
         if query_projection.projection:
@@ -80,9 +83,9 @@ class FirestoreProjectionBuilder(ProjectionBuilder):
             config["client_side_processing"] = True
             config["grouping"] = query_projection.grouping.fields
 
-        return config, None
+        return config
 
-    def build_count(self, query_projection: QueryProjection) -> Tuple[Dict, None]:
+    def build_count(self, query_projection: QueryProjection) -> Dict:
         """
         Build optimized COUNT query configuration from QueryProjection
 
@@ -90,19 +93,22 @@ class FirestoreProjectionBuilder(ProjectionBuilder):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (count_config_dict, None)
+            Firestore count query configuration dictionary
         """
-        self._require_collection_name("build_count")
-
+        # Note: collection_name is optional for Firestore as configs are collection-agnostic
         config = self.build_native_count_query()
 
         # Add filter if present
         if query_projection.filter:
             filter_query = FirestoreSpecificationBuilder.build(query_projection.filter)
             if filter_query:
-                config["where_clauses"] = filter_query
+                # Normalize to list: single tuple -> [tuple], list stays list
+                if isinstance(filter_query, tuple):
+                    config["where_clauses"] = [filter_query]
+                else:
+                    config["where_clauses"] = filter_query
 
-        return config, None
+        return config
 
     @staticmethod
     def build_query_config(projection: ProjectionList) -> Dict:

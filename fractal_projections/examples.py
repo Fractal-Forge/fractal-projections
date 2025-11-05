@@ -176,98 +176,152 @@ def example_count_distinct():
     return query_projection
 
 
-# Usage with different database backends:
-"""
-# PostgreSQL Repository
-def get_stats_postgres(repository):
-    from .builders import PostgresProjectionBuilder
+# ============================================================================
+# Usage with Repository Mixins
+# ============================================================================
+#
+# The ProjectionsMixin interface provides three methods:
+# - find_with_projection(query_projection) -> Iterator[dict]
+# - count_with_projection(query_projection) -> int
+# - explain_query(query_projection) -> List[str]
+#
+# All database-specific mixins follow this same interface. The mixin
+# internally handles building the appropriate database-specific query.
+
+
+def example_repository_usage_postgres():
+    """Example using PostgresProjectionsMixin"""
+    from fractal_repositories.contrib.postgres import PostgresRepositoryMixin
+
+    from fractal_projections.mixins import PostgresProjectionsMixin
+
+    class UserRepository(PostgresRepositoryMixin, PostgresProjectionsMixin):
+        table_name = "users"
+
+    # Create repository instance
+    repository = UserRepository()
+
+    # Define your query projection
+    query_projection = example_group_by()
+
+    # Execute query - mixin handles all builder logic internally
+    results = list(repository.find_with_projection(query_projection))
+    # Returns: [{'organization_id': 'org1', 'total_syncs': 10, 'total_rows': 5000}, ...]
+
+    # Count matching records
+    count = repository.count_with_projection(query_projection)
+
+    # Get query execution plan for optimization
+    plan = repository.explain_query(query_projection)
+    return results, count, plan
+
+
+def example_repository_usage_django():
+    """Example using DjangoProjectionsMixin"""
+    from django.db import models
+    from fractal_repositories.contrib.django import DjangoModelRepositoryMixin
+
+    from fractal_projections.mixins import DjangoProjectionsMixin
+
+    # Define your Django model
+    class User(models.Model):
+        name = models.CharField(max_length=100)
+        email = models.EmailField()
+        age = models.IntegerField()
+
+        class Meta:
+            db_table = "users"
+
+    # Create repository with projection support
+    class UserRepository(DjangoModelRepositoryMixin, DjangoProjectionsMixin):
+        entity = User
+        django_model = User
+
+    repository = UserRepository()
+    query_projection = example_group_by()
+
+    # Execute query - returns dictionaries, not model instances
+    results = list(repository.find_with_projection(query_projection))
+    count = repository.count_with_projection(query_projection)
+    plan = repository.explain_query(query_projection)
+    return results, count, plan
+
+
+def example_repository_usage_mongo():
+    """Example using MongoProjectionsMixin"""
+    from fractal_repositories.contrib.mongo import MongoRepositoryMixin
+    from pymongo import MongoClient
+
+    from fractal_projections.mixins import MongoProjectionsMixin
+
+    class EventRepository(MongoRepositoryMixin, MongoProjectionsMixin):
+        def __init__(self, collection):
+            self.collection = collection
+
+    # Create repository with MongoDB collection
+    client = MongoClient("mongodb://localhost:27017")
+    collection = client.mydb.events
+    repository = EventRepository(collection)
 
     query_projection = example_group_by()
 
-    if hasattr(repository, 'find_with_projection'):
-        # Build SQL using PostgresProjectionBuilder
-        builder = PostgresProjectionBuilder
-        sql_parts = {
-            'select': builder.build_select(query_projection.projection),
-            'group_by': builder.build_group_by(query_projection.grouping),
-            'order_by': builder.build_order_by(query_projection.ordering)
-        }
-        results = repository.find_with_projection(query_projection, sql_parts)
-        return results
-    else:
-        # Fallback to in-memory processing
-        all_events = list(repository.find(query_projection.filter))
-        return list(query_projection.projection.apply_to_results(all_events))
+    # Execute aggregation pipeline - mixin handles pipeline building
+    results = list(repository.find_with_projection(query_projection))
+    # Returns: [{'organization_id': 'org1', 'total_syncs': 10, 'total_rows': 5000}, ...]
+
+    count = repository.count_with_projection(query_projection)
+    plan = repository.explain_query(query_projection)
+    return results, count, plan
 
 
-# MongoDB Repository
-def get_stats_mongo(repository):
-    from .builders import MongoProjectionBuilder
+def example_repository_usage_duckdb():
+    """Example using DuckDBProjectionsMixin"""
+    import duckdb
+    from fractal_repositories.contrib.duckdb import DuckDBRepositoryMixin
 
-    query_projection = example_group_by()
+    from fractal_projections.mixins import DuckDBProjectionsMixin
 
-    if hasattr(repository, 'find_with_aggregation'):
-        # Build aggregation pipeline using MongoProjectionBuilder
-        pipeline = MongoProjectionBuilder.build_pipeline(
-            query_projection.projection,
-            query_projection.grouping,
-            query_projection.ordering,
-            query_projection.limiting
-        )
-        results = list(repository.find_with_aggregation(pipeline))
-        return results
-    else:
-        # Fallback to in-memory processing
-        all_events = list(repository.find(query_projection.filter))
-        return list(query_projection.projection.apply_to_results(all_events))
+    class AnalyticsRepository(DuckDBRepositoryMixin, DuckDBProjectionsMixin):
+        table_name = "analytics_events"
 
+        def __init__(self, connection):
+            self.connection = connection
 
-# Firestore Repository
-def get_stats_firestore(repository):
-    from .builders import FirestoreProjectionBuilder
+    # Create repository with DuckDB connection
+    conn = duckdb.connect("my_database.duckdb")
+    repository = AnalyticsRepository(conn)
 
     query_projection = example_group_by()
 
-    if hasattr(repository, 'find_with_projection'):
-        # Check if query needs client-side processing
-        builder = FirestoreProjectionBuilder
-        if builder.requires_client_processing(query_projection.projection):
-            # Complex aggregations need client-side processing
-            all_events = list(repository.find(query_projection.filter))
-            return list(query_projection.projection.apply_to_results(all_events))
-        else:
-            # Simple queries can use Firestore's native capabilities
-            query_config = builder.build_query_config(
-                query_projection.projection
-            )
-            results = list(
-                repository.find_with_projection(query_projection, query_config)
-            )
-            return results
-    else:
-        # Fallback to in-memory processing
-        all_events = list(repository.find(query_projection.filter))
-        return list(query_projection.projection.apply_to_results(all_events))
+    # Execute query
+    results = list(repository.find_with_projection(query_projection))
+    count = repository.count_with_projection(query_projection)
+    plan = repository.explain_query(query_projection)
+    return results, count, plan
 
 
-# Elasticsearch Repository
-def get_stats_elasticsearch(repository):
-    from .builders import ElasticsearchProjectionBuilder
+def example_repository_usage_firestore():
+    """Example using FirestoreProjectionsMixin"""
+    from fractal_repositories.contrib.firestore import FirestoreRepositoryMixin
+    from google.cloud import firestore
+
+    from fractal_projections.mixins import FirestoreProjectionsMixin
+
+    class DocumentRepository(FirestoreRepositoryMixin, FirestoreProjectionsMixin):
+        collection_name = "documents"
+
+        def __init__(self, db):
+            self.db = db
+
+    # Create repository with Firestore client
+    db = firestore.Client()
+    repository = DocumentRepository(db)
 
     query_projection = example_group_by()
 
-    if hasattr(repository, 'find_with_query_dsl'):
-        # Build Elasticsearch query DSL
-        es_query = ElasticsearchProjectionBuilder.build_query(
-            query_projection.projection,
-            query_projection.grouping,
-            query_projection.ordering,
-            query_projection.limiting
-        )
-        results = list(repository.find_with_query_dsl(es_query))
-        return results
-    else:
-        # Fallback to in-memory processing
-        all_events = list(repository.find(query_projection.filter))
-        return list(query_projection.projection.apply_to_results(all_events))
-"""
+    # Execute query - note: Firestore has limited aggregation support
+    # Complex aggregations may require client-side processing
+    results = list(repository.find_with_projection(query_projection))
+    count = repository.count_with_projection(query_projection)
+    plan = repository.explain_query(query_projection)
+    return results, count, plan

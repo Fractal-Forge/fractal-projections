@@ -12,17 +12,16 @@ from fractal_specifications.contrib.duckdb.specifications import (
 )
 
 from fractal_projections.builders.base import ProjectionBuilder
-from fractal_projections.projections.grouping import GroupingProjection
-from fractal_projections.projections.limiting import LimitProjection
-from fractal_projections.projections.ordering import OrderingList
-from fractal_projections.projections.query import QueryProjection
-
-from ..projections.fields import (
+from fractal_projections.projections.fields import (
     AggregateFunction,
     AggregateProjection,
     FieldProjection,
     ProjectionList,
 )
+from fractal_projections.projections.grouping import GroupingProjection
+from fractal_projections.projections.limiting import LimitProjection
+from fractal_projections.projections.ordering import OrderingList
+from fractal_projections.projections.query import QueryProjection
 
 
 class DuckDBProjectionBuilder(ProjectionBuilder):

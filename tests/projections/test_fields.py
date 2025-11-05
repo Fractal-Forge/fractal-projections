@@ -136,6 +136,14 @@ class TestAggregateProjection:
         results = [Item("A"), Item("B"), Item("A"), Item("C"), Item("B")]
         assert agg.apply_to_results(results) == 3
 
+    def test_apply_count_distinct_no_field(self):
+        """Test COUNT DISTINCT without field (on raw results)"""
+        agg = AggregateProjection(AggregateFunction.COUNT_DISTINCT)
+
+        # Test with hashable items
+        results = ["A", "B", "A", "C", "B"]
+        assert agg.apply_to_results(results) == 3
+
 
 class TestProjectionList:
     """Tests for ProjectionList class"""
@@ -223,6 +231,39 @@ class TestProjectionList:
 
         assert set(projected) == {"A", "B", "C"}
         assert len(projected) == 3
+
+    def test_apply_to_results_distinct_multiple_fields(self):
+        """Test applying projection with DISTINCT on multiple fields"""
+        proj_list = ProjectionList(
+            [FieldProjection("name"), FieldProjection("age")], distinct=True
+        )
+
+        class Item:
+            def __init__(self, name, age):
+                self.name = name
+                self.age = age
+
+        # Duplicate rows: (Alice, 30) appears twice, (Bob, 25) appears twice
+        results = [
+            Item("Alice", 30),
+            Item("Bob", 25),
+            Item("Alice", 30),
+            Item("Charlie", 35),
+            Item("Bob", 25),
+        ]
+        projected = list(proj_list.apply_to_results(results))
+
+        # Should filter out duplicates based on tuple of values
+        assert len(projected) == 3
+        expected = [
+            {"name": "Alice", "age": 30},
+            {"name": "Bob", "age": 25},
+            {"name": "Charlie", "age": 35},
+        ]
+        # Sort both lists for comparison since order might vary
+        assert sorted(projected, key=lambda x: x["name"]) == sorted(
+            expected, key=lambda x: x["name"]
+        )
 
     def test_apply_to_results_with_aggregates(self):
         """Test applying projection with aggregate functions"""

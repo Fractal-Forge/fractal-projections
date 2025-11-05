@@ -21,9 +21,12 @@ This library complements [fractal-specifications](https://pypi.org/project/fract
 - **Flexible**: Support for field selection, aggregations, grouping, ordering, and limiting
 - **Multi-Database Support**: Built-in builders for:
   - PostgreSQL
+  - Django ORM
+  - DuckDB
   - MongoDB
   - Firestore
   - Elasticsearch
+- **Repository Integration**: Ready-to-use mixins for [fractal-repositories](https://pypi.org/project/fractal-repositories/)
 
 ## Installation
 
@@ -36,6 +39,12 @@ For specific database support:
 ```bash
 # PostgreSQL
 pip install fractal-projections[postgres]
+
+# Django ORM
+pip install fractal-projections[django]
+
+# DuckDB
+pip install fractal-projections[duckdb]
 
 # MongoDB
 pip install fractal-projections[mongo]
@@ -58,6 +67,7 @@ from fractal_projections import (
     FieldProjection,
     ProjectionList,
     OrderingProjection,
+    OrderingList,
     LimitProjection,
 )
 from fractal_projections.builders import PostgresProjectionBuilder
@@ -71,8 +81,8 @@ query = QueryProjection(
         FieldProjection("name"),
         FieldProjection("created_at"),
     ]),
-    ordering=OrderingProjection("created_at", descending=True),
-    limit=LimitProjection(10),
+    ordering=OrderingList([OrderingProjection("created_at", ascending=False)]),
+    limiting=LimitProjection(10),
 )
 
 # Convert to database-specific query
@@ -98,18 +108,40 @@ projection = ProjectionList([
 ])
 ```
 
-### Aggregation
+### Distinct Selection
 
-Perform aggregations like COUNT, SUM, AVG:
+Select unique values using the `distinct` parameter:
 
 ```python
-from fractal_projections import AggregateProjection, AggregateFunction
+from fractal_projections import FieldProjection, ProjectionList
 
-projection = AggregateProjection(
-    field="revenue",
-    function=AggregateFunction.SUM,
-    alias="total_revenue"
+# SELECT DISTINCT department FROM users
+projection = ProjectionList(
+    [FieldProjection("department")],
+    distinct=True
 )
+```
+
+### Aggregation
+
+Perform aggregations using available aggregate functions: COUNT, SUM, AVG, MIN, MAX, COUNT_DISTINCT:
+
+```python
+from fractal_projections import AggregateProjection, AggregateFunction, ProjectionList
+
+# Single aggregate
+projection = ProjectionList([
+    AggregateProjection(AggregateFunction.SUM, "revenue", "total_revenue")
+])
+
+# Multiple aggregates
+projection = ProjectionList([
+    AggregateProjection(AggregateFunction.COUNT, alias="total_count"),
+    AggregateProjection(AggregateFunction.AVG, "salary", "avg_salary"),
+    AggregateProjection(AggregateFunction.MIN, "created_at", "earliest"),
+    AggregateProjection(AggregateFunction.MAX, "updated_at", "latest"),
+    AggregateProjection(AggregateFunction.COUNT_DISTINCT, "user_id", "unique_users"),
+])
 ```
 
 ### Grouping
@@ -130,8 +162,8 @@ Sort results by fields:
 from fractal_projections import OrderingProjection, OrderingList
 
 ordering = OrderingList([
-    OrderingProjection("created_at", descending=True),
-    OrderingProjection("name", descending=False),
+    OrderingProjection("created_at", ascending=False),  # descending
+    OrderingProjection("name", ascending=True),  # ascending
 ])
 ```
 
@@ -151,11 +183,14 @@ The library follows a builder pattern:
 
 1. **Projections**: Database-agnostic definitions of how data should be shaped
 2. **Builders**: Database-specific converters that translate projections into native queries
+3. **Mixins**: Repository mixins for seamless integration with fractal-repositories
 
 ```
 QueryProjection (agnostic)
     ↓
 PostgresProjectionBuilder → SQL
+DjangoProjectionBuilder → Django QuerySet
+DuckDBProjectionBuilder → SQL
 MongoProjectionBuilder → MongoDB Pipeline
 FirestoreProjectionBuilder → Firestore Query
 ElasticsearchProjectionBuilder → ES Query DSL
@@ -166,9 +201,78 @@ This separation allows you to:
 - Switch databases without changing application code
 - Get optimized native queries for each backend
 
+## Repository Integration
+
+Fractal Projections provides ready-to-use mixins for seamless integration with [fractal-repositories](https://pypi.org/project/fractal-repositories/). These mixins add projection capabilities to your repositories.
+
+### Available Mixins
+
+- `PostgresProjectionsMixin` - For PostgreSQL databases
+- `DjangoProjectionsMixin` - For Django ORM
+- `DuckDBProjectionsMixin` - For DuckDB databases
+- `MongoProjectionsMixin` - For MongoDB
+- `FirestoreProjectionsMixin` - For Firestore
+
+### Django Example
+
+```python
+from fractal_repositories.contrib.django import DjangoModelRepositoryMixin
+from fractal_projections import DjangoProjectionsMixin, QueryProjection, FieldProjection, ProjectionList
+from fractal_specifications.generic.operators import EqualsSpecification
+
+class UserRepository(DjangoModelRepositoryMixin, DjangoProjectionsMixin):
+    entity = User
+    django_model = DjangoUserModel
+
+# Use the repository with projections
+repo = UserRepository()
+
+# Define a projection query
+query = QueryProjection(
+    filter=EqualsSpecification("is_active", True),
+    projection=ProjectionList([
+        FieldProjection("id"),
+        FieldProjection("email"),
+        FieldProjection("username"),
+    ]),
+)
+
+# Execute the query using the mixin
+results = list(repo.find_with_projection(query))
+# Returns: [{'id': 1, 'email': 'user@example.com', 'username': 'user1'}, ...]
+
+# Count results
+count = repo.count_with_projection(query)
+
+# Get query explanation
+explanation = repo.explain_query(query)
+```
+
+### PostgreSQL Example
+
+```python
+from fractal_repositories.contrib.postgres import PostgresRepositoryMixin
+from fractal_projections import PostgresProjectionsMixin, QueryProjection
+
+class ProductRepository(PostgresRepositoryMixin, PostgresProjectionsMixin):
+    entity = Product
+    table_name = "products"
+
+repo = ProductRepository(connection)
+results = list(repo.find_with_projection(query))
+```
+
+### Mixin Methods
+
+All projection mixins provide these methods:
+
+- `find_with_projection(query_projection)` - Execute query and return results
+- `count_with_projection(query_projection)` - Count matching records
+- `explain_query(query_projection)` - Get query execution plan (for debugging/optimization)
+
 ## Advanced Usage
 
-See the [examples.py](fractal_projections/examples.py) file for comprehensive examples including:
+See the [examples.py](https://github.com/Fractal-Forge/fractal-projections/blob/main/fractal_projections/examples.py) file for comprehensive examples including:
 - Complex aggregations with grouping
 - Multi-field ordering
 - Combining filters with projections
@@ -208,3 +312,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Related Projects
 
 - [fractal-specifications](https://github.com/douwevandermeij/fractal-specifications) - Database-agnostic filtering system
+- [fractal-repositories](https://github.com/douwevandermeij/fractal-repositories) - Repository pattern implementation with projection support

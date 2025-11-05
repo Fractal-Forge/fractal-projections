@@ -4,7 +4,7 @@ MongoDB Projection Builder
 Converts generic projections to MongoDB aggregation pipeline stages.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from fractal_specifications.contrib.mongo.specifications import (
     MongoSpecificationBuilder,
@@ -35,7 +35,7 @@ class MongoProjectionBuilder(ProjectionBuilder):
         """
         super().__init__(collection_name)
 
-    def build(self, query_projection: QueryProjection) -> Tuple[List[Dict], None]:
+    def build(self, query_projection: QueryProjection) -> List[Dict]:
         """
         Build complete MongoDB aggregation pipeline from QueryProjection
 
@@ -43,15 +43,14 @@ class MongoProjectionBuilder(ProjectionBuilder):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (pipeline_list, None)
+            MongoDB aggregation pipeline as list of stage dictionaries
 
         Example:
             builder = MongoProjectionBuilder("users")
-            pipeline, _ = builder.build(query)
+            pipeline = builder.build(query)
             # pipeline is a list like [{"$match": {fractal_projections..}}, {"$group": {fractal_projections..}}]
         """
-        self._require_collection_name("build")
-
+        # Note: collection_name is optional for MongoDB as pipelines are collection-agnostic
         pipeline = []
 
         # Add $match stage for filter
@@ -70,9 +69,9 @@ class MongoProjectionBuilder(ProjectionBuilder):
 
         pipeline.extend(projection_pipeline)
 
-        return pipeline, None
+        return pipeline
 
-    def build_count(self, query_projection: QueryProjection) -> Tuple[List[Dict], None]:
+    def build_count(self, query_projection: QueryProjection) -> List[Dict]:
         """
         Build optimized COUNT aggregation pipeline from QueryProjection
 
@@ -80,10 +79,9 @@ class MongoProjectionBuilder(ProjectionBuilder):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (pipeline_list, None)
+            MongoDB aggregation pipeline for counting
         """
-        self._require_collection_name("build_count")
-
+        # Note: collection_name is optional for MongoDB as pipelines are collection-agnostic
         pipeline = []
 
         # Add $match stage for filter
@@ -95,7 +93,7 @@ class MongoProjectionBuilder(ProjectionBuilder):
         # Add $count stage
         pipeline.append({"$count": "count"})
 
-        return pipeline, None
+        return pipeline
 
     @staticmethod
     def build_pipeline(
@@ -201,10 +199,8 @@ class MongoProjectionBuilder(ProjectionBuilder):
                 # Include grouped fields in output
                 if grouping and field_spec.field in grouping.fields:
                     key = field_spec.alias or field_spec.field
-                    if len(grouping.fields) == 1:
-                        group_spec[key] = "$_id"
-                    else:
-                        group_spec[key] = f"$_id.{field_spec.field}"
+                    # Use $first to get the field value (all values in group are the same)
+                    group_spec[key] = {"$first": f"${field_spec.field}"}
 
         return {"$group": group_spec} if len(group_spec) > 1 else {}
 

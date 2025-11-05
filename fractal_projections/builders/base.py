@@ -5,7 +5,7 @@ Defines the interface that all database-specific builders must implement.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Tuple
+from typing import Any
 
 from fractal_projections.projections.query import QueryProjection
 
@@ -30,7 +30,7 @@ class ProjectionBuilder(ABC):
         self.collection_name = collection_name
 
     @abstractmethod
-    def build(self, query_projection: QueryProjection) -> Tuple[Any, Any]:
+    def build(self, query_projection: QueryProjection) -> Any:
         """
         Build a complete query from QueryProjection
 
@@ -38,11 +38,12 @@ class ProjectionBuilder(ABC):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (query, parameters/context)
-            - For SQL: (sql_string, params_list)
-            - For MongoDB: (pipeline, None)
-            - For Elasticsearch: (query_dict, None)
-            - For Firestore: (query_config, None)
+            The built query in database-specific format:
+            - SQL builders (Postgres, DuckDB): Tuple[str, List] - (sql_string, params_list)
+            - Django: QuerySet
+            - MongoDB: List[Dict] - aggregation pipeline
+            - Elasticsearch: Dict - query dict
+            - Firestore: Dict - query config
 
         Raises:
             ValueError: If collection_name is required but not set
@@ -50,7 +51,7 @@ class ProjectionBuilder(ABC):
         pass
 
     @abstractmethod
-    def build_count(self, query_projection: QueryProjection) -> Tuple[Any, Any]:
+    def build_count(self, query_projection: QueryProjection) -> Any:
         """
         Build an optimized count query from QueryProjection
 
@@ -61,7 +62,7 @@ class ProjectionBuilder(ABC):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (count_query, parameters/context) in the same format as build()
+            The count query in database-specific format (same types as build())
 
         Raises:
             ValueError: If collection_name is required but not set

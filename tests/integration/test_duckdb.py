@@ -10,6 +10,14 @@ import pytest
 pytest.importorskip("duckdb")
 
 import duckdb
+from fractal_specifications.generic.collections import AndSpecification, OrSpecification
+from fractal_specifications.generic.operators import (
+    EqualsSpecification,
+    GreaterThanEqualSpecification,
+    GreaterThanSpecification,
+    InSpecification,
+    LessThanSpecification,
+)
 
 from fractal_projections.builders.duckdb import DuckDBProjectionBuilder
 from fractal_projections.projections.fields import (
@@ -22,23 +30,16 @@ from fractal_projections.projections.grouping import GroupingProjection
 from fractal_projections.projections.limiting import LimitProjection
 from fractal_projections.projections.ordering import OrderingList, OrderingProjection
 from fractal_projections.projections.query import QueryProjection
-from fractal_specifications.generic.collections import AndSpecification, OrSpecification
-from fractal_specifications.generic.operators import (
-    EqualsSpecification,
-    GreaterThanEqualSpecification,
-    GreaterThanSpecification,
-    InSpecification,
-    LessThanSpecification,
-)
 
 
 @pytest.fixture
-def duckdb_connection():
+def duckdb_connection(test_user_data):
     """Create an in-memory DuckDB connection with test data"""
     conn = duckdb.connect(":memory:")
 
     # Create users table
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE users (
             id INTEGER,
             name VARCHAR,
@@ -49,20 +50,38 @@ def duckdb_connection():
             salary DECIMAL(10, 2),
             created_at TIMESTAMP
         )
-    """)
+    """
+    )
 
-    # Insert test data
-    conn.execute("""
-        INSERT INTO users VALUES
-        (1, 'Alice', 'alice@example.com', 30, 'active', 'Engineering', 75000.00, '2023-01-15 10:00:00'),
-        (2, 'Bob', 'bob@example.com', 25, 'active', 'Engineering', 65000.00, '2023-02-20 11:00:00'),
-        (3, 'Charlie', 'charlie@example.com', 35, 'inactive', 'Sales', 70000.00, '2023-03-10 12:00:00'),
-        (4, 'Diana', 'diana@example.com', 28, 'active', 'Marketing', 68000.00, '2023-04-05 13:00:00'),
-        (5, 'Eve', 'eve@example.com', 32, 'active', 'Engineering', 80000.00, '2023-05-12 14:00:00'),
-        (6, 'Frank', 'frank@example.com', 40, 'pending', 'Sales', 72000.00, '2023-06-18 15:00:00'),
-        (7, 'Grace', 'grace@example.com', 29, 'active', 'Marketing', 69000.00, '2023-07-22 16:00:00'),
-        (8, 'Henry', 'henry@example.com', 33, 'inactive', 'Engineering', 76000.00, '2023-08-30 17:00:00')
-    """)
+    # Insert test data from shared fixture
+    # Add synthetic created_at timestamps based on user ID
+    base_timestamps = [
+        "2023-01-15 10:00:00",
+        "2023-02-20 11:00:00",
+        "2023-03-10 12:00:00",
+        "2023-04-05 13:00:00",
+        "2023-05-12 14:00:00",
+        "2023-06-18 15:00:00",
+        "2023-07-22 16:00:00",
+        "2023-08-30 17:00:00",
+    ]
+
+    for i, user in enumerate(test_user_data):
+        conn.execute(
+            """
+            INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                user["id"],
+                user["name"],
+                user["email"],
+                user["age"],
+                user["status"],
+                user["department"],
+                user["salary"],
+                base_timestamps[i],
+            ],
+        )
 
     yield conn
     conn.close()
@@ -81,15 +100,17 @@ class TestDuckDBRealIntegration:
         result = duckdb_connection.execute(sql, params).fetchall()
 
         assert len(result) == 8
-        assert result[0][1] == 'Alice'  # name column
+        assert result[0][1] == "Alice"  # name column
 
     def test_select_specific_fields(self, duckdb_connection):
         """Test SELECT with specific fields"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("name"),
-                FieldProjection("age"),
-            ])
+            projection=ProjectionList(
+                [
+                    FieldProjection("name"),
+                    FieldProjection("age"),
+                ]
+            )
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -99,14 +120,14 @@ class TestDuckDBRealIntegration:
 
         assert len(result) == 8
         assert len(result[0]) == 2  # Only 2 columns
-        assert result[0][0] == 'Alice'
+        assert result[0][0] == "Alice"
         assert result[0][1] == 30
 
     def test_filter_equals(self, duckdb_connection):
         """Test WHERE with equals filter"""
         query = QueryProjection(
             filter=EqualsSpecification("status", "active"),
-            projection=ProjectionList([FieldProjection("name")])
+            projection=ProjectionList([FieldProjection("name")]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -116,18 +137,20 @@ class TestDuckDBRealIntegration:
 
         assert len(result) == 5  # 5 active users
         names = [row[0] for row in result]
-        assert 'Alice' in names
-        assert 'Bob' in names
-        assert 'Charlie' not in names  # inactive
+        assert "Alice" in names
+        assert "Bob" in names
+        assert "Charlie" not in names  # inactive
 
     def test_filter_greater_than(self, duckdb_connection):
         """Test WHERE with greater than filter"""
         query = QueryProjection(
             filter=GreaterThanSpecification("age", 30),
-            projection=ProjectionList([
-                FieldProjection("name"),
-                FieldProjection("age"),
-            ])
+            projection=ProjectionList(
+                [
+                    FieldProjection("name"),
+                    FieldProjection("age"),
+                ]
+            ),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -143,10 +166,12 @@ class TestDuckDBRealIntegration:
         """Test WHERE with IN clause"""
         query = QueryProjection(
             filter=InSpecification("department", ["Engineering", "Sales"]),
-            projection=ProjectionList([
-                FieldProjection("name"),
-                FieldProjection("department"),
-            ])
+            projection=ProjectionList(
+                [
+                    FieldProjection("name"),
+                    FieldProjection("department"),
+                ]
+            ),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -161,11 +186,13 @@ class TestDuckDBRealIntegration:
     def test_filter_and_condition(self, duckdb_connection):
         """Test WHERE with AND condition"""
         query = QueryProjection(
-            filter=AndSpecification([
-                EqualsSpecification("status", "active"),
-                GreaterThanEqualSpecification("age", 30),
-            ]),
-            projection=ProjectionList([FieldProjection("name")])
+            filter=AndSpecification(
+                [
+                    EqualsSpecification("status", "active"),
+                    GreaterThanEqualSpecification("age", 30),
+                ]
+            ),
+            projection=ProjectionList([FieldProjection("name")]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -176,17 +203,19 @@ class TestDuckDBRealIntegration:
         # Alice (30), Eve (32) - Grace (29) is excluded because age >= 30
         assert len(result) == 2
         names = [row[0] for row in result]
-        assert 'Alice' in names
-        assert 'Eve' in names
+        assert "Alice" in names
+        assert "Eve" in names
 
     def test_filter_or_condition(self, duckdb_connection):
         """Test WHERE with OR condition"""
         query = QueryProjection(
-            filter=OrSpecification([
-                EqualsSpecification("department", "Sales"),
-                LessThanSpecification("age", 27),
-            ]),
-            projection=ProjectionList([FieldProjection("name")])
+            filter=OrSpecification(
+                [
+                    EqualsSpecification("department", "Sales"),
+                    LessThanSpecification("age", 27),
+                ]
+            ),
+            projection=ProjectionList([FieldProjection("name")]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -198,18 +227,20 @@ class TestDuckDBRealIntegration:
         # Age < 27: Bob (25)
         assert len(result) == 3
         names = [row[0] for row in result]
-        assert 'Bob' in names
-        assert 'Charlie' in names
-        assert 'Frank' in names
+        assert "Bob" in names
+        assert "Charlie" in names
+        assert "Frank" in names
 
     def test_order_by_ascending(self, duckdb_connection):
         """Test ORDER BY ascending"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("name"),
-                FieldProjection("age"),
-            ]),
-            ordering=OrderingList([OrderingProjection("age", ascending=True)])
+            projection=ProjectionList(
+                [
+                    FieldProjection("name"),
+                    FieldProjection("age"),
+                ]
+            ),
+            ordering=OrderingList([OrderingProjection("age", ascending=True)]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -220,17 +251,19 @@ class TestDuckDBRealIntegration:
         # Should be ordered by age ascending
         ages = [row[1] for row in result]
         assert ages == sorted(ages)
-        assert result[0][0] == 'Bob'  # Youngest (25)
-        assert result[-1][0] == 'Frank'  # Oldest (40)
+        assert result[0][0] == "Bob"  # Youngest (25)
+        assert result[-1][0] == "Frank"  # Oldest (40)
 
     def test_order_by_descending(self, duckdb_connection):
         """Test ORDER BY descending"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("name"),
-                FieldProjection("salary"),
-            ]),
-            ordering=OrderingList([OrderingProjection("salary", ascending=False)])
+            projection=ProjectionList(
+                [
+                    FieldProjection("name"),
+                    FieldProjection("salary"),
+                ]
+            ),
+            ordering=OrderingList([OrderingProjection("salary", ascending=False)]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -241,13 +274,13 @@ class TestDuckDBRealIntegration:
         # Should be ordered by salary descending
         salaries = [float(row[1]) for row in result]
         assert salaries == sorted(salaries, reverse=True)
-        assert result[0][0] == 'Eve'  # Highest salary (80000)
+        assert result[0][0] == "Eve"  # Highest salary (80000)
 
     def test_limit(self, duckdb_connection):
         """Test LIMIT clause"""
         query = QueryProjection(
             projection=ProjectionList([FieldProjection("name")]),
-            limiting=LimitProjection(3)
+            limiting=LimitProjection(3),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -262,7 +295,7 @@ class TestDuckDBRealIntegration:
         query = QueryProjection(
             projection=ProjectionList([FieldProjection("name")]),
             ordering=OrderingList([OrderingProjection("id", ascending=True)]),
-            limiting=LimitProjection(3, offset=2)
+            limiting=LimitProjection(3, offset=2),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -272,16 +305,18 @@ class TestDuckDBRealIntegration:
 
         assert len(result) == 3
         # With offset 2, should start from 3rd user (Charlie)
-        assert result[0][0] == 'Charlie'
+        assert result[0][0] == "Charlie"
 
     def test_group_by_with_count(self, duckdb_connection):
         """Test GROUP BY with COUNT aggregate"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("department"),
-                AggregateProjection(AggregateFunction.COUNT, alias="count"),
-            ]),
-            grouping=GroupingProjection(["department"])
+            projection=ProjectionList(
+                [
+                    FieldProjection("department"),
+                    AggregateProjection(AggregateFunction.COUNT, alias="count"),
+                ]
+            ),
+            grouping=GroupingProjection(["department"]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -294,18 +329,22 @@ class TestDuckDBRealIntegration:
 
         # Convert to dict for easier testing
         dept_counts = {row[0]: row[1] for row in result}
-        assert dept_counts['Engineering'] == 4
-        assert dept_counts['Sales'] == 2
-        assert dept_counts['Marketing'] == 2
+        assert dept_counts["Engineering"] == 4
+        assert dept_counts["Sales"] == 2
+        assert dept_counts["Marketing"] == 2
 
     def test_group_by_with_avg(self, duckdb_connection):
         """Test GROUP BY with AVG aggregate"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("department"),
-                AggregateProjection(AggregateFunction.AVG, field="salary", alias="avg_salary"),
-            ]),
-            grouping=GroupingProjection(["department"])
+            projection=ProjectionList(
+                [
+                    FieldProjection("department"),
+                    AggregateProjection(
+                        AggregateFunction.AVG, field="salary", alias="avg_salary"
+                    ),
+                ]
+            ),
+            grouping=GroupingProjection(["department"]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -317,20 +356,28 @@ class TestDuckDBRealIntegration:
 
         # Engineering: (75000 + 65000 + 80000 + 76000) / 4 = 74000
         dept_avgs = {row[0]: float(row[1]) for row in result}
-        assert abs(dept_avgs['Engineering'] - 74000.0) < 0.01
+        assert abs(dept_avgs["Engineering"] - 74000.0) < 0.01
 
     def test_group_by_with_multiple_aggregates(self, duckdb_connection):
         """Test GROUP BY with multiple aggregates"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("status"),
-                AggregateProjection(AggregateFunction.COUNT, alias="count"),
-                AggregateProjection(AggregateFunction.AVG, field="age", alias="avg_age"),
-                AggregateProjection(AggregateFunction.MIN, field="salary", alias="min_salary"),
-                AggregateProjection(AggregateFunction.MAX, field="salary", alias="max_salary"),
-            ]),
+            projection=ProjectionList(
+                [
+                    FieldProjection("status"),
+                    AggregateProjection(AggregateFunction.COUNT, alias="count"),
+                    AggregateProjection(
+                        AggregateFunction.AVG, field="age", alias="avg_age"
+                    ),
+                    AggregateProjection(
+                        AggregateFunction.MIN, field="salary", alias="min_salary"
+                    ),
+                    AggregateProjection(
+                        AggregateFunction.MAX, field="salary", alias="max_salary"
+                    ),
+                ]
+            ),
             grouping=GroupingProjection(["status"]),
-            ordering=OrderingList([OrderingProjection("status", ascending=True)])
+            ordering=OrderingList([OrderingProjection("status", ascending=True)]),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -342,16 +389,14 @@ class TestDuckDBRealIntegration:
         assert len(result) == 3
 
         # Find active status row
-        active_row = [row for row in result if row[0] == 'active'][0]
+        active_row = [row for row in result if row[0] == "active"][0]
         assert active_row[1] == 5  # 5 active users
         # avg_age for active: (30+25+28+32+29)/5 = 28.8
         assert abs(float(active_row[2]) - 28.8) < 0.1
 
     def test_count_query(self, duckdb_connection):
         """Test optimized COUNT query"""
-        query = QueryProjection(
-            filter=EqualsSpecification("status", "active")
-        )
+        query = QueryProjection(filter=EqualsSpecification("status", "active"))
 
         builder = DuckDBProjectionBuilder("users")
         sql, params = builder.build_count(query)
@@ -363,9 +408,7 @@ class TestDuckDBRealIntegration:
     def test_distinct_select(self, duckdb_connection):
         """Test SELECT DISTINCT"""
         query = QueryProjection(
-            projection=ProjectionList([
-                FieldProjection("department")
-            ], distinct=True)
+            projection=ProjectionList([FieldProjection("department")], distinct=True)
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -375,28 +418,34 @@ class TestDuckDBRealIntegration:
 
         assert len(result) == 3  # 3 unique departments
         departments = [row[0] for row in result]
-        assert 'Engineering' in departments
-        assert 'Sales' in departments
-        assert 'Marketing' in departments
+        assert "Engineering" in departments
+        assert "Sales" in departments
+        assert "Marketing" in departments
 
     def test_complex_query(self, duckdb_connection):
         """Test complex query with multiple features"""
         query = QueryProjection(
-            filter=AndSpecification([
-                InSpecification("status", ["active", "pending"]),
-                GreaterThanSpecification("age", 25),
-            ]),
-            projection=ProjectionList([
-                FieldProjection("name"),
-                FieldProjection("age"),
-                FieldProjection("department"),
-                FieldProjection("salary"),
-            ]),
-            ordering=OrderingList([
-                OrderingProjection("department", ascending=True),
-                OrderingProjection("salary", ascending=False),
-            ]),
-            limiting=LimitProjection(5)
+            filter=AndSpecification(
+                [
+                    InSpecification("status", ["active", "pending"]),
+                    GreaterThanSpecification("age", 25),
+                ]
+            ),
+            projection=ProjectionList(
+                [
+                    FieldProjection("name"),
+                    FieldProjection("age"),
+                    FieldProjection("department"),
+                    FieldProjection("salary"),
+                ]
+            ),
+            ordering=OrderingList(
+                [
+                    OrderingProjection("department", ascending=True),
+                    OrderingProjection("salary", ascending=False),
+                ]
+            ),
+            limiting=LimitProjection(5),
         )
 
         builder = DuckDBProjectionBuilder("users")
@@ -417,7 +466,7 @@ class TestDuckDBRealIntegration:
         """Test that EXPLAIN query executes without error"""
         query = QueryProjection(
             projection=ProjectionList([FieldProjection("name")]),
-            limiting=LimitProjection(10)
+            limiting=LimitProjection(10),
         )
 
         builder = DuckDBProjectionBuilder("users")

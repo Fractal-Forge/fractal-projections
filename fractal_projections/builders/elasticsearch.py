@@ -4,7 +4,7 @@ Elasticsearch Projection Builder
 Converts generic projections to Elasticsearch query DSL with aggregations.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from fractal_specifications.contrib.elasticsearch.specifications import (
     ElasticSpecificationBuilder,
@@ -36,7 +36,7 @@ class ElasticsearchProjectionBuilder(ProjectionBuilder):
         super().__init__(index_name)
         self.index_name = index_name  # Alias for backwards compatibility
 
-    def build(self, query_projection: QueryProjection) -> Tuple[Dict, None]:
+    def build(self, query_projection: QueryProjection) -> Dict:
         """
         Build complete Elasticsearch query from QueryProjection
 
@@ -44,11 +44,11 @@ class ElasticsearchProjectionBuilder(ProjectionBuilder):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (query_dict, None)
+            Elasticsearch query dictionary
 
         Example:
             builder = ElasticsearchProjectionBuilder("users")
-            query, _ = builder.build(query_projection)
+            query = builder.build(query_projection)
         """
         self._require_collection_name("build")
 
@@ -66,9 +66,9 @@ class ElasticsearchProjectionBuilder(ProjectionBuilder):
             if es_query:
                 query["query"] = es_query
 
-        return query, None
+        return query
 
-    def build_count(self, query_projection: QueryProjection) -> Tuple[Dict, None]:
+    def build_count(self, query_projection: QueryProjection) -> Dict:
         """
         Build optimized COUNT query from QueryProjection
 
@@ -76,7 +76,7 @@ class ElasticsearchProjectionBuilder(ProjectionBuilder):
             query_projection: The query projection to convert
 
         Returns:
-            Tuple of (count_query_dict, None)
+            Elasticsearch count query dictionary
         """
         self._require_collection_name("build_count")
 
@@ -89,7 +89,7 @@ class ElasticsearchProjectionBuilder(ProjectionBuilder):
                 query["query"] = es_query
 
         # For count queries, we just need the query part, not aggregations
-        return query, None
+        return query
 
     @staticmethod
     def build_query(
