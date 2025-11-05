@@ -14,7 +14,7 @@ from fractal_projections.builders import *
 from fractal_projections.mixins import *
 from fractal_projections.projections import *
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     # Core projections

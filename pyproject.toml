@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "fractal-projections"
-version = "0.3.0"
+version = "0.3.1"
 description = "A comprehensive projection system for defining how data should be shaped, aggregated, grouped, ordered, and limited in database queries"
 readme = "README.md"
 authors = [
